@@ -70,19 +70,41 @@ export function collectMediaStorageKeys(value: unknown, keys = new Set<string>()
 function readVideoMeta(url: string) {
     return new Promise<{ width: number; height: number; durationMs?: number }>((resolve) => {
         const video = document.createElement("video");
-        const done = () => resolve({ width: video.videoWidth || 1280, height: video.videoHeight || 720, durationMs: Number.isFinite(video.duration) ? Math.round(video.duration * 1000) : undefined });
-        video.onloadedmetadata = done;
-        video.onerror = done;
+        video.preload = "metadata";
+        video.muted = true;
+        video.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            resolve({ width: video.videoWidth || 1280, height: video.videoHeight || 720, durationMs: Number.isFinite(video.duration) ? Math.round(video.duration * 1000) : undefined });
+            if (video.parentNode) video.parentNode.removeChild(video);
+        };
+        const timer = setTimeout(finish, 8000);
+        video.onloadedmetadata = () => { clearTimeout(timer); finish(); };
+        video.onerror = () => { clearTimeout(timer); finish(); };
+        document.body.appendChild(video);
         video.src = url;
+        video.load();
     });
 }
 
 function readAudioMeta(url: string) {
     return new Promise<{ durationMs?: number }>((resolve) => {
         const audio = document.createElement("audio");
-        const done = () => resolve({ durationMs: Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : undefined });
-        audio.onloadedmetadata = done;
-        audio.onerror = done;
+        audio.preload = "metadata";
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            resolve({ durationMs: Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : undefined });
+            if (audio.parentNode) audio.parentNode.removeChild(audio);
+        };
+        const timer = setTimeout(finish, 8000);
+        audio.onloadedmetadata = () => { clearTimeout(timer); finish(); };
+        audio.onerror = () => { clearTimeout(timer); finish(); };
+        document.body.appendChild(audio);
         audio.src = url;
+        audio.load();
     });
 }
